@@ -1,3 +1,4 @@
 # brutos de coleta (grandes; não versionar)
-dados/
+dados/brutos/
 __pycache__/
+supabase/.temp/

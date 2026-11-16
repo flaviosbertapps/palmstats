@@ -14,6 +14,7 @@ import time
 import requests
 
 BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer/all"
+CORE = "https://sports.core.api.espn.com/v2/sports/soccer"
 PALMEIRAS = "2029"
 UA = "palmstats/0.1 (projeto de torcedor, sem fins comerciais)"
 PAUSA = 0.5  # segundos entre requisições
@@ -47,9 +48,34 @@ def main():
                      raiz / "calendario" / f"{ano}.json", forcar=True)
         eventos = cal.get("events", [])
         for ev in eventos:
-            baixar(sess, f"{BASE}/summary?event={ev['id']}",
-                   raiz / "partidas" / f"{ev['id']}.json")
+            # Rebaixa partidas que ainda não estavam encerradas na última coleta.
+            encerrada = ev.get("competitions", [{}])[0].get("status", {}).get("type", {}).get("completed")
+            destino = raiz / "partidas" / f"{ev['id']}.json"
+            if destino.exists() and encerrada:
+                d = json.loads(destino.read_text())
+                ja = d["header"]["competitions"][0].get("status", {}).get("type", {}).get("completed")
+                forcar = not ja
+            else:
+                forcar = False
+            if encerrada or not destino.exists():
+                baixar(sess, f"{BASE}/summary?event={ev['id']}", destino, forcar=forcar)
         print(ano, len(eventos), "partidas")
+    baixar_atletas(sess, raiz)
+
+
+def baixar_atletas(sess, raiz):
+    """Bio (nascimento, nacionalidade) de todo atleta que atuou pelo Palmeiras."""
+    ids = set()
+    for f in (raiz / "partidas").glob("*.json"):
+        for r in json.loads(f.read_text()).get("rosters", []):
+            if r["team"]["id"] == PALMEIRAS:
+                ids |= {p["athlete"]["id"] for p in r.get("roster", [])}
+    for i in sorted(ids):
+        try:
+            baixar(sess, f"{CORE}/athletes/{i}", raiz / "atletas" / f"{i}.json")
+        except RuntimeError as e:
+            print("atleta sem bio:", e)
+    print(len(ids), "atletas")
 
 
 if __name__ == "__main__":
