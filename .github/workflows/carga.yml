@@ -36,10 +36,18 @@ jobs:
 
       - run: pip install -r coleta/requirements.txt
 
-      - uses: actions/cache@v4
+      # Testa a conexão antes da coleta: senha errada falha em segundos, não em 20 min.
+      - name: Testa conexão com o Supabase
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "::error::Secret SUPABASE_DB_URL não configurado"; exit 1; fi
+          psql "$DATABASE_URL" -c "select 1" > /dev/null || {
+            echo "::error::Não conectou no Supabase. Confira a senha em SUPABASE_DB_URL (sem [YOUR-PASSWORD]; caracteres especiais precisam de codificação URL, ex.: @ vira %40)."
+            exit 1; }
+
+      - uses: actions/cache/restore@v4
         with:
           path: dados/brutos
-          key: brutos-${{ github.run_id }}
+          key: brutos-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: brutos-
 
       - name: Coleta ESPN
@@ -52,6 +60,13 @@ jobs:
 
       - name: Coleta Wikidata
         run: python coleta/wikidata.py --saida dados/brutos
+
+      # Salva os brutos mesmo que migrations ou carga falhem depois.
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: dados/brutos
+          key: brutos-${{ github.run_id }}-${{ github.run_attempt }}
 
       - uses: supabase/setup-cli@v1
         with:
