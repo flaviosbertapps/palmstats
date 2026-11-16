@@ -104,6 +104,7 @@ Em `dados/manual/tecnicos.csv`, as passagens com `conferido=false` têm datas ap
 3. No GitHub: **Settings → Secrets and variables → Actions**:
    - *Secret* `SUPABASE_DB_URL` = a string acima;
    - *Variable* `CARGA_ATIVA` = `true`.
+   A senha vai no lugar de `[YOUR-PASSWORD]`. Se tiver caracteres especiais, codifique: `@`→`%40`, `#`→`%23`, `/`→`%2F`, `:`→`%3A`, `%`→`%25`, `?`→`%3F`. Também dá para gerar uma senha só com letras e números em **Database → Settings → Reset database password**.
 4. Em **Actions → carga → Run workflow**, preencha `de = 2015` e `ate = 2025` para a carga inicial (~20 minutos). A partir daí ele roda sozinho todo dia às 06:17 (Brasília), atualizando a temporada corrente e mantendo o projeto gratuito ativo.
 
 Para rodar localmente:
