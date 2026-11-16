@@ -1,0 +1,64 @@
+name: carga
+
+# Coleta ESPN + Wikidata e carrega no Supabase.
+# Diária: atualiza a temporada corrente e mantém o projeto gratuito do
+# Supabase ativo (ele pausa após 7 dias sem uso).
+on:
+  schedule:
+    - cron: "17 9 * * *"   # 06:17 em Brasília
+  workflow_dispatch:
+    inputs:
+      de:
+        description: "Primeira temporada (vazio = ano corrente)"
+        required: false
+      ate:
+        description: "Última temporada (vazio = ano corrente)"
+        required: false
+
+concurrency: carga
+
+jobs:
+  carga:
+    # Só roda depois de configurado (Settings → Secrets and variables → Actions):
+    #   secret   SUPABASE_DB_URL = string de conexão do Supabase (Session pooler)
+    #   variable CARGA_ATIVA     = true
+    if: vars.CARGA_ATIVA == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r coleta/requirements.txt
+
+      - uses: actions/cache@v4
+        with:
+          path: dados/brutos
+          key: brutos-${{ github.run_id }}
+          restore-keys: brutos-
+
+      - name: Coleta ESPN
+        run: |
+          ANO=$(date -u +%Y)
+          python coleta/espn.py --de "${DE:-$ANO}" --ate "${ATE:-$ANO}" --saida dados/brutos
+        env:
+          DE: ${{ inputs.de }}
+          ATE: ${{ inputs.ate }}
+
+      - name: Coleta Wikidata
+        run: python coleta/wikidata.py --saida dados/brutos
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Migrations
+        run: supabase db push --db-url "$DATABASE_URL" --include-all --yes
+
+      - name: Carga
+        run: python coleta/normalizar.py dados/brutos

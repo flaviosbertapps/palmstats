@@ -1,12 +1,10 @@
-# Coleta
+# Coleta e carga
 
-Scripts da prova de dados (ver `docs/prova-de-dados.md`).
+| Script | O que faz |
+|---|---|
+| `espn.py` | Baixa calendário, partidas e bio dos atletas do Palmeiras (API pública da ESPN) |
+| `wikidata.py` | Baixa da Wikidata os futebolistas candidatos (por data de nascimento) |
+| `normalizar.py` | Brutos → tabelas do Postgres/Supabase, com as regras de conferência |
+| `cobertura_espn.py` | Relatório de cobertura usado na prova de dados |
 
-```bash
-pip install -r coleta/requirements.txt
-python coleta/espn.py --de 2015 --ate 2025 --saida dados/brutos
-python coleta/cobertura_espn.py dados/brutos --csv-brasileirao CAMINHO/campeonato-brasileiro-full.csv
-```
-
-O CSV de conferência vem de https://github.com/adaoduque/Brasileirao_Dataset (opcional).
-Os brutos (~276 MB) ficam em `dados/`, fora do git.
+Passo a passo e regras: [`docs/banco.md`](../docs/banco.md). Os brutos ficam em `dados/brutos/`, fora do git.
