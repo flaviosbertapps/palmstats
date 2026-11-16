@@ -37,27 +37,61 @@ Visões prontas: `v_partidas` (partida com nomes), `v_jogador_temporada` (totais
 5. **Mando neutro**: Mundial, Supercopa, final única da Libertadores (desde 2019) e qualquer "mando" do Palmeiras fora do Brasil. A ESPN não marca isso de forma confiável.
 6. **Minutos são regulamentares** (90' ou 120' com prorrogação), sem acréscimos.
 7. **Idempotente.** Pode rodar de novo à vontade: cada partida é reescrita por inteiro.
+8. **`jogou`** indica se o jogador entrou em campo, mesmo quando a ESPN não informa o minuto. As contagens de jogos usam essa coluna.
 
 ## Validações feitas
 
 - **Técnicos**: 380 jogos do Brasileirão 2015–2024 comparados com o técnico registrado no dataset `adaoduque`. 360 batem, 20 tiveram auxiliar no banco por suspensão (esperado) e nenhum diverge.
-- **Placar × gols individuais**: só 2 partidas não fecham, e ambas estão na fila de revisão.
+- **Placar × gols individuais**: só 1 partida não fecha, um amistoso sem elenco na ESPN.
 - **Artilheiros**: Dudu com 16 gols em 2015 (igual à Wikipedia) e Rony com 23 em 2022.
 - **Idempotência**: duas cargas seguidas produzem o mesmo resultado.
 
-## Fila de revisão (143 itens)
+## Fila de revisão
 
-| Motivo | Itens | O que fazer |
+Na carga local de 16/11/2026, a fila tinha **26 itens pendentes**, todos `sem_par_wikidata`: jogadores com apelido (Robinho, Keno, Vitinho) ou da base sem cadastro casável na Wikidata. Os demais motivos já foram tratados:
+
+| Motivo | Itens | Situação |
 |---|---|---|
-| `wikidata_conferir` | 43 | Confirmar se o vínculo com a Wikidata está certo (casou só pelo primeiro nome) |
-| `sem_par_wikidata` | 26 | Apelidos e jovens da base: ligar à mão ou deixar sem vínculo |
-| `evento_duplicado_descartado` | 24 | Informativo: duplicatas da ESPN já removidas |
-| `wikidata_ambiguo` | 7 | Escolher entre os candidatos listados |
-| `sem_escalacao` | 2 | Partida sem elenco na ESPN |
-| `atleta_duplicado_descartado` | 2 | Informativo |
-| `gols_nao_conferem` | 1 | Corrigir à mão |
+| `sem_par_wikidata` | 26 | **Pendente**: ligar à mão (`jogador,<espn_id>,wikidata_id,Q…`) ou aceitar sem vínculo |
+| `wikidata_conferir` | 43 | Conferidos: 40 confirmados e 2 vínculos desfeitos por falta de evidência |
+| `wikidata_ambiguo` | 2 | Resolvidos por correção (Kevin e Daniel) |
+| `sem_escalacao` | 2 | Amistosos da Florida Cup 2020 sem elenco na ESPN: aceitos |
+| `evento_duplicado_descartado`, `atleta_duplicado_descartado`, `entrada_sem_minuto` | 30 | Informativos: a carga já trata e grava como resolvidos |
 
-Ainda não existe um mecanismo de correção manual que sobreviva à recarga. É o próximo item técnico (tabela `correcoes` aplicada no fim da carga).
+Consulta para ver o que falta:
+
+```sql
+select entidade, chave, motivo, detalhe from revisao where not resolvido order by motivo;
+```
+
+## Correções manuais
+
+Ficam em [`dados/manual/correcoes.csv`](../dados/manual/correcoes.csv), versionadas no repositório e **reaplicadas no fim de toda carga**. Por isso sobrevivem à recarga diária. Formato e campos permitidos estão em [`coleta/correcoes.py`](../coleta/correcoes.py). Exemplos:
+
+```csv
+entidade,chave,campo,valor,justificativa
+jogador,224675,wikidata_id,Q65718441,"Daniel, brasileiro, nasc. 13/05/1996"
+jogador,371494,wikidata_id,,"vínculo errado: valor vazio grava NULL"
+jogador,317351,mesclar_em,330764,"ESPN tem dois IDs para o mesmo jogador"
+participacao,434607/198756,gols,1,"exemplo: corrigir gol de um jogador numa partida"
+partida,760339,arbitro,Darío Herrera,"exemplo: corrigir árbitro"
+revisao,partida/563205/sem_escalacao,resolvido,true,"conferido, está certo"
+```
+
+- Uma correção marca como resolvidos os itens da fila do mesmo alvo.
+- Correção inválida (campo não permitido, alvo inexistente) **não derruba a carga**. Ela vira item `correcao_invalida` na fila e aviso no log da Action.
+- Para corrigir, edite o CSV pelo próprio GitHub (lápis no arquivo → commit). A próxima carga aplica.
+
+## Defeitos da ESPN tratados automaticamente
+
+| Defeito | Tratamento |
+|---|---|
+| Gol repetido com minuto diferente (ex.: CSA 1x1 Palmeiras, 2019) | Gols são identificados pelo placar parcial no texto do evento |
+| Evento repetido com outro ID | Deduplicado por tipo, minuto e participantes |
+| Atleta repetido no elenco | Mantém a primeira ocorrência |
+| Reserva que jogou sem registro de entrada (ex.: Rafael Marques, Internacional 1x1, 2015) | Coluna `jogou` independente do minuto; o gol é atribuído |
+| Campo neutro não marcado | Regras por competição (ver acima) |
+| Mesmo jogador com dois IDs | Correção `mesclar_em` |
 
 ## Datas de técnicos a verificar
 

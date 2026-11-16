@@ -22,6 +22,8 @@ import unicodedata
 import psycopg
 from psycopg.types.json import Jsonb
 
+import correcoes
+
 PALMEIRAS = "2029"
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 COMPETICOES = {
@@ -63,6 +65,9 @@ GENERICOS = {"silva", "santos", "souza", "sousa", "oliveira", "pereira", "costa"
              "filho", "neto", "lima", "rodrigues", "ferreira", "almeida", "alves", "gomes",
              "martins", "carvalho", "ribeiro", "lopes", "barbosa", "araujo", "nascimento",
              "dos", "das", "del", "los", "las"}
+
+
+PLACAR_PARCIAL = re.compile(r"([^.!]+? \d+, [^.!]+? \d+)\.")
 
 
 def norm(s):
@@ -176,7 +181,13 @@ class Carga:
                         if nomes & (norm(w.get("nome")) | norm(w.get("nomeCompleto"))):
                             cands.append(w)
                 cands = list({w["qid"]: w for w in cands}.values())
-                if len(cands) > 1:  # desempate: quem tem o Palmeiras cadastrado
+                if len(cands) > 1:  # desempate 1: mais tokens do nome em comum
+                    pontos = {w["qid"]: len(nomes & (norm(w.get("nome")) | norm(w.get("nomeCompleto"))))
+                              for w in cands}
+                    melhor = max(pontos.values())
+                    if sum(1 for v in pontos.values() if v == melhor) == 1:
+                        cands = [w for w in cands if pontos[w["qid"]] == melhor]
+                if len(cands) > 1:  # desempate 2: quem tem o Palmeiras cadastrado
                     pal = [w for w in cands if w.get("palmeiras")]
                     cands = pal if len(pal) == 1 else cands
             w = cands[0] if len(cands) == 1 and cands[0]["qid"] not in usados else None
@@ -191,6 +202,11 @@ class Carga:
                 self.revisar("jogador", a["id"], "sem_par_wikidata" if not cands else "wikidata_ambiguo",
                              {"nome": a.get("fullName"), "nascimento": nasc,
                               "candidatos": [c["qid"] for c in cands]})
+            if w:  # QID já atribuído (por correção) a outro jogador: não disputa
+                dono = self.c.execute("select espn_id from jogadores where wikidata_id = %s",
+                                      (w["qid"],)).fetchone()
+                if dono and dono[0] != a["id"]:
+                    w = None
             self.jogadores[a["id"]] = self.upsert("jogadores", "espn_id", {
                 "espn_id": a["id"], "nome": a.get("displayName") or a.get("fullName"),
                 "nome_completo": (w or {}).get("nomeCompleto") or a.get("fullName"),
@@ -275,6 +291,11 @@ class Carga:
             minuto, acr = relogio(k.get("clock", {}).get("displayValue"))
             # A ESPN às vezes repete o mesmo evento com IDs diferentes.
             assinatura = (txt, minuto, acr, tuple(p["id"] for p in parts), k.get("shootout"))
+            # Gol: o placar parcial no texto ("CSA 0, Palmeiras 1") identifica o gol
+            # mesmo quando a ESPN repete o evento com outro minuto.
+            parcial = PLACAR_PARCIAL.search(k.get("text") or "") if k.get("scoringPlay") else None
+            if parcial and not k.get("shootout"):
+                assinatura = ("gol", " ".join(parcial.group(1).split()))
             if assinatura in vistos:
                 self.revisar("partida", eid, "evento_duplicado_descartado",
                              {"tipo": txt, "minuto": minuto, "id": k["id"]})
@@ -336,16 +357,20 @@ class Carga:
                     saida = m
             if entrada is not None and saida is None:
                 saida = fim_jogo
+            jogou = (entrada is not None or bool(p.get("subbedIn")) or aid in gols_ev
+                     or bool(st and st.get("APP")))
+            if jogou and entrada is None:
+                self.revisar("partida", eid, "entrada_sem_minuto", {"atleta": aid, "nome": p["athlete"]["displayName"]})
             linha = {"partida_id": pid, "jogador_id": self.jogadores[aid],
-                     "titular": bool(p.get("starter")), "camisa": int(p["jersey"]) if p.get("jersey", "").isdigit() else None,
+                     "titular": bool(p.get("starter")), "jogou": jogou, "camisa": int(p["jersey"]) if p.get("jersey", "").isdigit() else None,
                      "posicao": (p.get("position") or {}).get("displayName"),
                      "minuto_entrada": entrada, "minuto_saida": saida if entrada is not None else None,
                      "minutos": max(0, saida - entrada) if entrada is not None and saida is not None else None}
             for k, col in STATS_JOGADOR.items():
                 linha[col] = int(st[k]) if st and st.get(k) is not None else None
             if eventos_ok:  # eventos deduplicados são a fonte de gols/assistências
-                linha["gols"] = gols_ev.get(aid, 0) if entrada is not None else 0
-                linha["assistencias"] = assist_ev.get(aid, 0) if entrada is not None else 0
+                linha["gols"] = gols_ev.get(aid, 0) if jogou else 0
+                linha["assistencias"] = assist_ev.get(aid, 0) if jogou else 0
             cols = list(linha)
             self.c.execute(f"insert into participacoes ({', '.join(cols)}) values ({', '.join(['%s'] * len(cols))})",
                            [linha[c] for c in cols])
@@ -363,10 +388,14 @@ class Carga:
             self.c.execute(f"insert into estatisticas_time ({', '.join(cols)}) values ({', '.join(['%s'] * len(cols))})",
                            [linha[c] for c in cols])
 
+    # Registrados para auditoria, mas já tratados pela carga: não exigem ação.
+    INFORMATIVOS = {"evento_duplicado_descartado", "atleta_duplicado_descartado", "entrada_sem_minuto"}
+
     def gravar_revisoes(self):
         for r in self.revisoes:
-            self.c.execute("insert into revisao (entidade, chave, motivo, detalhe) values (%s,%s,%s,%s) "
-                           "on conflict (entidade, chave, motivo) do update set detalhe = excluded.detalhe", r)
+            self.c.execute("insert into revisao (entidade, chave, motivo, detalhe, resolvido) values (%s,%s,%s,%s,%s) "
+                           "on conflict (entidade, chave, motivo) do update set detalhe = excluded.detalhe",
+                           (*r, r[2] in self.INFORMATIVOS))
 
 
 def main():
@@ -379,7 +408,12 @@ def main():
         c.carregar_jogadores()
         n = c.carregar_partidas()
         c.gravar_revisoes()
-        print(f"{n} partidas, {len(c.jogadores)} jogadores, {len(c.revisoes)} itens para revisão")
+        aplicadas, erros = correcoes.aplicar(conn, RAIZ / "dados/manual/correcoes.csv")
+        for e in erros:
+            print(f"::warning title=Correção inválida::{e}")
+        pend = conn.execute("select count(*) from revisao where not resolvido").fetchone()[0]
+        print(f"{n} partidas, {len(c.jogadores)} jogadores, {aplicadas} correções aplicadas, "
+              f"{len(erros)} inválidas, {pend} itens pendentes na revisão")
 
 
 if __name__ == "__main__":
