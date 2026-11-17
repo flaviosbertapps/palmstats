@@ -82,6 +82,10 @@ export default async function Jogador({ params }: { params: Params }) {
         <Numero v={`${n(t.amarelos)} / ${n(t.vermelhos)}`} r="amarelos / vermelhos" />
       </div>
 
+      <p>
+        <Link href={`/explorar?jogador=${id}`}>Explorar {j.nome}: com e sem ele em campo, por adversário, técnico… →</Link>
+      </p>
+
       <h2>Por temporada e competição</h2>
       <div className="tabela">
         <table>

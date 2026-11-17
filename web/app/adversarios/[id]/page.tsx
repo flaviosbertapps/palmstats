@@ -94,6 +94,8 @@ export default async function Adversario({ params }: { params: Params }) {
         )}
       </div>
 
+      <p><Link href={`/explorar?adversario=${id}`}>Cruzar este confronto com jogador, técnico ou mando →</Link></p>
+
       <h2>Todos os jogos</h2>
       <TabelaPartidas partidas={jogos} />
     </>

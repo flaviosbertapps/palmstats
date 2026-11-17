@@ -119,3 +119,8 @@ th a.ativo { color: var(--verde); }
 
 .aviso { font-size: 13px; color: var(--suave); }
 footer { max-width: 1080px; margin: 0 auto; padding: 0 16px 32px; font-size: 12px; color: var(--suave); }
+
+.painel-filtros { margin: 8px 0 16px; }
+.painel-filtros > summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+.painel-filtros[open] > summary { margin-bottom: 4px; }
+.alerta { color: var(--derrota); margin: -4px 0 8px; }
