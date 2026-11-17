@@ -33,7 +33,7 @@ O risco é o contrário disso: um site que só repete tabela e placar não tem m
 
 1. ~~**Explorador de consultas** (`/explorar`)~~ **Feito.** Inclui "com e sem o jogador", aviso de amostra pequena e links a partir das páginas de jogador e adversário. Na descrição original: Filtros combináveis: jogador, adversário, competição, mando, técnico, período, titular ou reserva. Devolve totais e lista de jogos, e é o recurso de maior valor e diferencial. Exige uma view "participação enriquecida" e um formulário bem feito.
 2. **Neste dia** (`/neste-dia/[mm-dd]`). Todas as partidas da data e os aniversariantes do elenco. Pronto para virar post diário.
-3. **Comparador de jogadores** (`/comparar?a=…&b=…`): dois perfis lado a lado, por 90 minutos.
+3. ~~**Comparador de jogadores**~~ **Feito** (`/comparar`): por 90 minutos, gols decisivos, jogos grandes, juntos e separados.
 4. **Parcerias** (`/parcerias`): quem mais jogou junto, duplas de zaga com melhor aproveitamento e garçom → artilheiro.
 5. **Temporada** (`/temporadas/[ano]`): campanha por competição, elenco com minutagem, artilharia e linha do tempo do técnico.
 6. **Mapa de gols** (`/jogadores/[id]#chutes`): a ESPN dá a posição de onde saíram os gols (`pos_x`, `pos_y`). Dá um campo com os pontos, sem precisar de xG.
@@ -55,6 +55,7 @@ Placar ao vivo, notícias, palpites, comentários e login. Nenhum deles depende 
 - **Quem decide do banco**: Rony fez 17 gols entrando no segundo tempo, Breno 14 e López 13.
 - **O Palmeiras marca mais no fim**: 294 gols entre os 76' e o apito final, a faixa mais produtiva, contra 161 nos primeiros 15 minutos.
 - **23% dos gols são de cabeça.**
+- **Gols que valem pontos**: tirando os gols de cada jogador do jogo em que foram marcados, os do **Veiga renderam 83 pontos** (48 gols decisivos, 44% do total). Dudu vem com 53 e Willian com 52. Só 31% dos gols do Rony foram decisivos: muitos saíram em jogos já resolvidos.
 - **Endrick é o mais jovem a marcar**: 16 anos e 3 meses, contra o Athletico, em 26/10/2022.
 
 ### Resultados e sequências

@@ -71,6 +71,7 @@ export default async function Jogadores({ searchParams }: { searchParams: Busca 
         </label>
         <button type="submit">Filtrar</button>
       </form>
+      <p className="sub"><Link href="/comparar">Comparar dois jogadores lado a lado →</Link></p>
       <p className="sub">Clique no cabeçalho para ordenar. Assistências vêm dos eventos de gol da ESPN.</p>
       <div className="tabela">
         <table>
