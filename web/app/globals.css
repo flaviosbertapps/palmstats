@@ -1,0 +1,121 @@
+:root {
+  --verde: #006437;
+  --verde-escuro: #00432a;
+  --verde-claro: #e7f2ec;
+  --fundo: #f7f8f7;
+  --cartao: #ffffff;
+  --texto: #1b1f1d;
+  --suave: #5d6762;
+  --borda: #dfe4e1;
+  --vitoria: #1a7f45;
+  --empate: #8a8f8c;
+  --derrota: #c0392b;
+  --raio: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --verde: #2fae6a;
+    --verde-escuro: #0d2a1c;
+    --verde-claro: #16301f;
+    --fundo: #0f1311;
+    --cartao: #171c19;
+    --texto: #e8ece9;
+    --suave: #9aa59f;
+    --borda: #2a322d;
+    --vitoria: #2fae6a;
+    --empate: #8a8f8c;
+    --derrota: #e0604f;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--texto);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+a { color: var(--verde); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+header.topo {
+  background: var(--verde-escuro);
+  color: #fff;
+}
+header.topo .linha {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+header.topo a { color: #fff; }
+header.topo .marca { font-weight: 800; font-size: 18px; letter-spacing: .3px; }
+header.topo nav { display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; }
+
+main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 20px 16px 48px;
+}
+
+h1 { font-size: 26px; margin: 4px 0 4px; }
+h2 { font-size: 18px; margin: 28px 0 10px; }
+.sub { color: var(--suave); margin: 0 0 16px; }
+
+.grade { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.cartao {
+  background: var(--cartao);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 14px 16px;
+}
+.cartao h2 { margin-top: 0; }
+
+.tabela { overflow-x: auto; background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--borda); white-space: nowrap; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .4px; color: var(--suave); font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+th a { color: inherit; }
+th a.ativo { color: var(--verde); }
+
+.res { display: inline-block; min-width: 22px; text-align: center; border-radius: 4px; color: #fff; font-weight: 700; font-size: 12px; padding: 1px 5px; }
+.res.V { background: var(--vitoria); }
+.res.E { background: var(--empate); }
+.res.D { background: var(--derrota); }
+
+.placar-grande { display: flex; align-items: center; gap: 18px; font-size: 22px; font-weight: 700; flex-wrap: wrap; }
+.placar-grande .gols { font-size: 40px; font-variant-numeric: tabular-nums; }
+
+.filtros { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0 16px; align-items: end; }
+.filtros label { display: flex; flex-direction: column; font-size: 12px; color: var(--suave); gap: 3px; }
+.filtros select, .filtros button {
+  font: inherit; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--borda);
+  background: var(--cartao); color: var(--texto);
+}
+.filtros button { background: var(--verde); color: #fff; border-color: var(--verde); cursor: pointer; }
+
+.numeros { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.numero { background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio); padding: 10px 12px; }
+.numero .v { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.numero .r { font-size: 12px; color: var(--suave); }
+
+.lista { list-style: none; margin: 0; padding: 0; }
+.lista li { padding: 7px 0; border-bottom: 1px solid var(--borda); display: flex; justify-content: space-between; gap: 10px; }
+.lista li:last-child { border-bottom: 0; }
+
+.curio { border-left: 4px solid var(--verde); }
+.curio .titulo { font-weight: 700; margin-bottom: 4px; }
+
+.barra { height: 8px; border-radius: 4px; background: var(--verde-claro); overflow: hidden; display: flex; }
+.barra span { background: var(--verde); }
+
+.aviso { font-size: 13px; color: var(--suave); }
+footer { max-width: 1080px; margin: 0 auto; padding: 0 16px 32px; font-size: 12px; color: var(--suave); }
