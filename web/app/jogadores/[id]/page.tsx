@@ -84,6 +84,8 @@ export default async function Jogador({ params }: { params: Params }) {
 
       <p>
         <Link href={`/explorar?jogador=${id}`}>Explorar {j.nome}: com e sem ele em campo, por adversário, técnico… →</Link>
+        <br />
+        <Link href={`/comparar?a=${id}`}>Comparar {j.nome} com outro jogador →</Link>
       </p>
 
       <h2>Por temporada e competição</h2>

@@ -56,7 +56,7 @@ export function fase(f: string | null) {
   const t: [RegExp, string][] = [
     [/^Finals?$/i, "Final"],
     [/Semi-?finals?/i, "Semifinal"],
-    [/Quarter-?finals?/i, "Quartas de final"],
+    [/Quarter[- ]?finals?|Cuartos de Final/i, "Quartas de final"],
     [/Round of 16/i, "Oitavas de final"],
     [/Group Stage/i, "Fase de grupos"],
     [/Third Place/i, "Disputa de 3º lugar"],
