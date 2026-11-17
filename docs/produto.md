@@ -31,7 +31,7 @@ O risco é o contrário disso: um site que só repete tabela e placar não tem m
 
 ### Próximas (ordem sugerida)
 
-1. **Explorador de consultas** (`/explorar`). Filtros combináveis: jogador, adversário, competição, mando, técnico, período, titular ou reserva. Devolve totais e lista de jogos, e é o recurso de maior valor e diferencial. Exige uma view "participação enriquecida" e um formulário bem feito.
+1. ~~**Explorador de consultas** (`/explorar`)~~ **Feito.** Inclui "com e sem o jogador", aviso de amostra pequena e links a partir das páginas de jogador e adversário. Na descrição original: Filtros combináveis: jogador, adversário, competição, mando, técnico, período, titular ou reserva. Devolve totais e lista de jogos, e é o recurso de maior valor e diferencial. Exige uma view "participação enriquecida" e um formulário bem feito.
 2. **Neste dia** (`/neste-dia/[mm-dd]`). Todas as partidas da data e os aniversariantes do elenco. Pronto para virar post diário.
 3. **Comparador de jogadores** (`/comparar?a=…&b=…`): dois perfis lado a lado, por 90 minutos.
 4. **Parcerias** (`/parcerias`): quem mais jogou junto, duplas de zaga com melhor aproveitamento e garçom → artilheiro.
@@ -125,3 +125,13 @@ O melhor aproveitamento é com Rafael Klein (86,7% em 10 jogos) e o pior com Fl�
 4. **Deploy.** O build já consulta o banco (início, técnicos e curiosidades são pré-geradas), então a carga do Supabase precisa ter rodado antes.
 
 As páginas se atualizam sozinhas a cada hora. O plano Hobby é gratuito e serve, já que o projeto não é comercial.
+
+## 7. Analytics
+
+O site usa o **Vercel Web Analytics** (`@vercel/analytics`): sem cookies, sem dados pessoais e gratuito no plano Hobby, com limite mensal de eventos. Para começar a coletar:
+
+1. No projeto na Vercel: **Analytics → Enable**.
+2. Faça um novo deploy. O script só é servido pela Vercel; localmente ele dá 404, e isso é esperado.
+
+O que observar nas primeiras semanas: quais páginas são abertas, se o `/explorar` é usado além da primeira visita, e de onde vêm os acessos.
+
