@@ -41,7 +41,8 @@ def stats_jogador(p):
     v = {}
     for g in p.get("stats", []):
         for k, s in g.get("stats", {}).items():
-            v[s.get("key") or k] = s.get("stat", {}).get("value")
+            st = s.get("stat", {})
+            v[s.get("key") or k] = st if "total" in st else st.get("value")
     return v
 
 
@@ -52,6 +53,33 @@ def xg_time(c, casa):
                 h, a = (num(x) for x in s["stats"])
                 return (h, a) if casa else (a, h)
     return None, None
+
+
+def funcao(pos, usual):
+    """Grade de posições do FotMob (linha*10 + coluna, coluna 1–9) -> função.
+
+    11 = goleiro; linha 3 = defesa; 4–7 = meio; 8 = meia/pontas; 9+ = ataque.
+    Nas pontas do meio, o "usual" do FotMob (1 = defensor) separa ala de ponta.
+    """
+    if not pos:
+        return None
+    if pos == 11:
+        return "gol"
+    linha, col = divmod(pos, 10)
+    borda = col <= 2 or col >= 8
+    if linha == 3:
+        return "lat" if borda else "zag"
+    if 4 <= linha <= 7:
+        return ("lat" if usual == 1 else "ponta") if borda else "vol"
+    if linha == 8:
+        return "meia" if 4 <= col <= 6 else "ponta"
+    return "ponta" if borda else "ata"
+
+
+def fracao(v, k):
+    """Estatística do FotMob em forma "acertos/total": devolve (valor, total)."""
+    s = v.get(k)
+    return (s, None) if not isinstance(s, dict) else (s.get("value"), s.get("total"))
 
 
 def main():
@@ -65,6 +93,7 @@ def main():
     revisoes = []
     with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
         c = conn.cursor()
+        c.execute("delete from xg_finalizacao")
         c.execute("delete from xg_participacao")
         c.execute("delete from xg_partida")
         c.execute("delete from revisao where entidade = 'xg'")
@@ -97,11 +126,14 @@ def main():
                                  {"partida_id": pid, "data": str(dia), "fotmob": coach, "banco": tecnico_banco}))
             camisas = {str(p["id"]): str(p.get("shirtNumber") or "")
                        for p in lado.get("starters", []) + lado.get("subs", [])}
+            funcoes = {str(p["id"]): funcao(p.get("positionId"), p.get("usualPlayingPositionId"))
+                       for p in lado.get("starters", [])}
 
             elenco = c.execute(
                 "select x.jogador_id, x.camisa, j.nome, j.nome_completo from participacoes x "
                 "join jogadores j on j.id = x.jogador_id where x.partida_id = %s and x.jogou", (pid,)).fetchall()
             usados = set()
+            por_fotmob = {}
             for p in (d.get("playerStats") or {}).values():
                 if p.get("teamId") != PALMEIRAS:
                     continue
@@ -120,11 +152,31 @@ def main():
                                      {"partida_id": pid, "nome": p["name"], "camisa": cam}))
                     continue
                 usados.add(alvo[0][0])
-                c.execute("insert into xg_participacao values (%s,%s,%s,%s,%s,%s,%s,%s)",
-                          (pid, alvo[0][0], fid, v.get("minutes_played"), v.get("expected_goals"),
-                           v.get("expected_goals_non_penalty"), v.get("expected_goals_on_target_variant"),
-                           v.get("expected_assists")))
+                por_fotmob[fid] = alvo[0][0]
+                pc, pt = fracao(v, "accurate_passes")
+                dg, dp = v.get("duel_won"), v.get("duel_lost")
+                c.execute(
+                    "insert into xg_participacao (partida_id, jogador_id, fotmob_jogador_id, minutos, xg, "
+                    "xg_sem_penalti, xgot, xa, funcao, desarmes, interceptacoes, recuperacoes, duelos_ganhos, "
+                    "duelos_perdidos, passes_certos, passes, chances_criadas, passes_terco_final) "
+                    "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (pid, alvo[0][0], fid, v.get("minutes_played"), v.get("expected_goals"),
+                     v.get("expected_goals_non_penalty"), v.get("expected_goals_on_target_variant"),
+                     v.get("expected_assists"), funcoes.get(fid), v.get("matchstats.headers.tackles"),
+                     v.get("interceptions"), v.get("recoveries"), dg, dp, pc, pt,
+                     v.get("chances_created"), v.get("passes_into_final_third")))
                 n_j += 1
+            for s_ in (d.get("shotmap") or {}).get("shots", []):
+                if s_.get("period") == "PenaltyShootout":
+                    continue
+                nosso = s_.get("teamId") == PALMEIRAS
+                c.execute(
+                    "insert into xg_finalizacao (partida_id, fotmob_id, do_palmeiras, jogador_id, minuto, acrescimo, "
+                    "xg, xgot, situacao, gol, gol_contra) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) "
+                    "on conflict (fotmob_id) do nothing",
+                    (pid, str(s_["id"]), nosso, por_fotmob.get(str(s_.get("playerId"))) if nosso else None,
+                     s_.get("min"), s_.get("minAdded"), s_.get("expectedGoals"), s_.get("expectedGoalsOnTarget"),
+                     s_.get("situation"), s_.get("eventType") == "Goal", bool(s_.get("isOwnGoal"))))
         for r in revisoes:
             # Técnico divergente costuma ser auxiliar em jogo de suspensão (regra 4):
             # fica registrado para conferência, sem contar como pendência.
