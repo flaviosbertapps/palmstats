@@ -56,7 +56,7 @@ def aplicar(conn, caminho):
             erros.append(f"linha {n} ({ent},{chave},{campo}): {e}")
     for e in erros:
         conn.execute("insert into revisao (entidade, chave, motivo, detalhe) values ('correcao', %s, 'correcao_invalida', "
-                     "jsonb_build_object('erro', %s)) on conflict (entidade, chave, motivo) do update set "
+                     "jsonb_build_object('erro', %s::text)) on conflict (entidade, chave, motivo) do update set "
                      "detalhe = excluded.detalhe, resolvido = false", (e.split(" ")[1], e))
     return aplicadas, erros
 
