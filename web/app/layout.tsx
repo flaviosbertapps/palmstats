@@ -17,6 +17,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Link href="/" className="marca">PalmStats</Link>
             <nav>
               <Link href="/explorar">Explorar</Link>
+              <Link href="/aproveitamento">Aproveitamento</Link>
               <Link href="/partidas">Partidas</Link>
               <Link href="/jogadores">Jogadores</Link>
               <Link href="/tecnicos">Técnicos</Link>
