@@ -16,6 +16,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="linha">
             <Link href="/" className="marca">PalmStats</Link>
             <nav>
+              <Link href="/2026">2026</Link>
               <Link href="/explorar">Explorar</Link>
               <Link href="/aproveitamento">Aproveitamento</Link>
               <Link href="/partidas">Partidas</Link>
@@ -27,7 +28,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
         <main>{children}</main>
         <footer>
-          Projeto de torcedor, sem fins comerciais e sem vínculo com a S.E. Palmeiras. Dados: ESPN e Wikidata,
+          Projeto de torcedor, sem fins comerciais e sem vínculo com a S.E. Palmeiras. Dados: ESPN e Wikidata (xG de 2026: FotMob),
           desde 2015. Minutos são regulamentares, sem acréscimos. “–” significa que a fonte não traz o dado.
         </footer>
         <Analytics />

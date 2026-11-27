@@ -25,7 +25,8 @@ Site de estatísticas do **Palmeiras (futebol masculino)** para torcedor fanáti
 
 ```
 ESPN (API pública) ─┐
-Wikidata (SPARQL) ──┼─► coleta/*.py ─► dados/brutos/ (fora do git, cache do Actions)
+Wikidata (SPARQL) ──┤
+FotMob (xG, 2026) ──┼─► coleta/*.py ─► dados/brutos/ (fora do git, cache do Actions)
 CSVs manuais ───────┘         │
                               ▼
                      coleta/normalizar.py ─► Supabase (Postgres) ─► web/ (Next.js na Vercel)
@@ -35,6 +36,7 @@ CSVs manuais ───────┘         │
 | Pasta / arquivo | Conteúdo |
 |---|---|
 | `coleta/espn.py` | Baixa calendário, resumo de cada partida e bio dos atletas (`site.api.espn.com`, `sports.core.api.espn.com`). Palmeiras = time `2029`. |
+| `coleta/fotmob.py` + `coleta/xg.py` | xG do FotMob (só a temporada corrente; o endpoint do time não lista anos anteriores). `xg.py` roda depois de `normalizar.py`, reescreve `xg_partida`/`xg_participacao`, casa jogador pela camisa na partida e registra em `revisao` (resolvido) os jogos em que o FotMob aponta outro técnico, normalmente o auxiliar em suspensão. |
 | `coleta/wikidata.py` | Baixa futebolistas candidatos por data de nascimento (±1 dia). |
 | `coleta/normalizar.py` | Brutos → tabelas, com as regras de conferência. É idempotente e reescreve cada partida inteira. |
 | `coleta/correcoes.py` + `dados/manual/correcoes.csv` | Correções manuais versionadas, reaplicadas no fim de toda carga. |
@@ -47,6 +49,7 @@ CSVs manuais ───────┘         │
 
 - **ESPN**: cobre todas as competições desde 2015 (Brasileirão, Paulistão, Copa do Brasil, Libertadores, Recopa, Supercopa, Mundial). Traz escalação, substituições com minuto, gols, cartões, estatísticas de time (posse, chutes, passes, desarmes), público, árbitro (só a partir de 2022) e posição dos chutes de gol. **Não traz** técnico, passes e desarmes por jogador, nota, xG nem acréscimos. Antes de 2008 o dado é inutilizável; 2008–2014 vem com titulares marcados errado (12 a 14 por jogo).
 - **Wikidata (CC0)**: nome completo e vínculo do jogador. Casamento por nascimento + sobrenome não genérico; 191 de 224 jogadores ligados.
+- **FotMob**: xG do time (pró/contra) e xG, xG sem pênalti, xGOT e xA por jogador. Não traz xG na Copa do Brasil 2026. Modelo próprio (Opta), sem fonte para conferir: o site mostra sempre como estimativa.
 - **Testadas e descartadas**: Sofascore, FBref e TheSportsDB bloqueiam IP de datacenter; o servidor da CBF derruba a conexão; football-data.org e API-Football exigem cadastro e não foram testadas.
 
 ## Banco (Supabase)
@@ -66,7 +69,7 @@ Tabelas: `partidas`, `participacoes` (jogador do Palmeiras × partida), `eventos
 
 ## Site (`web/`)
 
-Páginas: `/` (início, "neste dia"), `/explorar` (filtros combináveis e "com e sem o jogador"), `/comparar` (dois jogadores, por 90 minutos, gols decisivos, juntos e separados), `/partidas`, `/partidas/[id]`, `/jogadores`, `/jogadores/[id]`, `/adversarios/[id]`, `/tecnicos` e `/curiosidades`.
+Páginas: `/2026` (análise da temporada com xG), `/` (início, "neste dia"), `/explorar` (filtros combináveis e "com e sem o jogador"), `/comparar` (dois jogadores, por 90 minutos, gols decisivos, juntos e separados), `/partidas`, `/partidas/[id]`, `/jogadores`, `/jogadores/[id]`, `/adversarios/[id]`, `/tecnicos` e `/curiosidades`.
 
 Convenções:
 - SQL só no servidor (`lib/db.ts`, biblioteca `postgres`, `prepare: false`); páginas com `revalidate = 3600`.

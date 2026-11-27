@@ -11,6 +11,8 @@
   --empate: #8a8f8c;
   --derrota: #c0392b;
   --raio: 10px;
+  --serie-pro: #006437;
+  --serie-contra: #d97a1e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -26,6 +28,8 @@
     --vitoria: #2fae6a;
     --empate: #8a8f8c;
     --derrota: #e0604f;
+    --serie-pro: #2fae6a;
+    --serie-contra: #c96f1a;
   }
 }
 
@@ -124,3 +128,12 @@ footer { max-width: 1080px; margin: 0 auto; padding: 0 16px 32px; font-size: 12p
 .painel-filtros > summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
 .painel-filtros[open] > summary { margin-bottom: 4px; }
 .alerta { color: var(--derrota); margin: -4px 0 8px; }
+
+.grafico { background: var(--cartao); border: 1px solid var(--borda); border-radius: var(--raio); padding: 12px; position: relative; }
+.grafico svg { display: block; width: 100%; height: auto; }
+.grafico .eixo { stroke: var(--borda); }
+.grafico text { fill: var(--suave); font-size: 11px; }
+.legenda { display: flex; gap: 16px; font-size: 13px; color: var(--suave); margin-bottom: 6px; flex-wrap: wrap; }
+.legenda i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.dica { position: absolute; pointer-events: none; background: var(--cartao); border: 1px solid var(--borda); border-radius: 8px; padding: 6px 9px; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.15); white-space: nowrap; }
+.pos { color: var(--vitoria); } .neg { color: var(--derrota); }

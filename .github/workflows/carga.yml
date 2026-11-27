@@ -61,6 +61,11 @@ jobs:
       - name: Coleta Wikidata
         run: python coleta/wikidata.py --saida dados/brutos
 
+      # xG da temporada corrente. API não documentada: se falhar, a carga principal segue.
+      - name: Coleta FotMob (xG)
+        continue-on-error: true
+        run: python coleta/fotmob.py --saida dados/brutos
+
       # Salva os brutos mesmo que migrations ou carga falhem depois.
       - uses: actions/cache/save@v4
         if: always()
@@ -77,3 +82,7 @@ jobs:
 
       - name: Carga
         run: python coleta/normalizar.py dados/brutos
+
+      - name: Carga xG
+        continue-on-error: true
+        run: python coleta/xg.py dados/brutos
