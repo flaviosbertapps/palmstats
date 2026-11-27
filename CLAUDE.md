@@ -36,7 +36,7 @@ CSVs manuais ───────┘         │
 | Pasta / arquivo | Conteúdo |
 |---|---|
 | `coleta/espn.py` | Baixa calendário, resumo de cada partida e bio dos atletas (`site.api.espn.com`, `sports.core.api.espn.com`). Palmeiras = time `2029`. |
-| `coleta/fotmob.py` + `coleta/xg.py` | xG do FotMob (só a temporada corrente; o endpoint do time não lista anos anteriores). `xg.py` roda depois de `normalizar.py`, reescreve `xg_partida`/`xg_participacao`, casa jogador pela camisa na partida e registra em `revisao` (resolvido) os jogos em que o FotMob aponta outro técnico, normalmente o auxiliar em suspensão. |
+| `coleta/fotmob.py` + `coleta/xg.py` | xG do FotMob (só a temporada corrente; o endpoint do time não lista anos anteriores). `xg.py` roda depois de `normalizar.py`, reescreve `xg_partida`/`xg_participacao`/`xg_finalizacao` (mapa de chutes), grava a função do titular pela grade de posições do FotMob, casa jogador pela camisa na partida e registra em `revisao` (resolvido) os jogos em que o FotMob aponta outro técnico, normalmente o auxiliar em suspensão. |
 | `coleta/wikidata.py` | Baixa futebolistas candidatos por data de nascimento (±1 dia). |
 | `coleta/normalizar.py` | Brutos → tabelas, com as regras de conferência. É idempotente e reescreve cada partida inteira. |
 | `coleta/correcoes.py` + `dados/manual/correcoes.csv` | Correções manuais versionadas, reaplicadas no fim de toda carga. |
@@ -69,7 +69,7 @@ Tabelas: `partidas`, `participacoes` (jogador do Palmeiras × partida), `eventos
 
 ## Site (`web/`)
 
-Páginas: `/2026` (análise da temporada com xG), `/` (início, "neste dia"), `/explorar` (filtros combináveis e "com e sem o jogador"), `/comparar` (dois jogadores, por 90 minutos, gols decisivos, juntos e separados), `/partidas`, `/partidas/[id]`, `/jogadores`, `/jogadores/[id]`, `/adversarios/[id]`, `/tecnicos` e `/curiosidades`.
+Páginas: `/2026` (análise da temporada com xG), `/escalacao` (xG do time com cada jogador e dupla em campo, por setor), `/` (início, "neste dia"), `/explorar` (filtros combináveis e "com e sem o jogador"), `/comparar` (dois jogadores, por 90 minutos, gols decisivos, juntos e separados), `/partidas`, `/partidas/[id]`, `/jogadores`, `/jogadores/[id]`, `/adversarios/[id]`, `/tecnicos` e `/curiosidades`.
 
 Convenções:
 - SQL só no servidor (`lib/db.ts`, biblioteca `postgres`, `prepare: false`); páginas com `revalidate = 3600`.
@@ -77,6 +77,7 @@ Convenções:
 - Avisos de método: amostra pequena (< 10 jogos), menos de 900 minutos, posições diferentes e "correlação, não causa". **"Sem ele" só conta jogos do período em que o jogador estava no clube.**
 - **Gols decisivos**: sem os gols do jogador naquele jogo, o resultado mudaria. **Pontos rendidos** = pontos do resultado real menos os pontos sem os gols dele (mata-mata tratado como pontos corridos).
 - Clássicos = Corinthians, São Paulo e Santos.
+- **xG em campo** (`lib/escalacao.ts`): soma chute a chute do mapa do FotMob dentro do intervalo entrada–saída da ESPN; chutes nos acréscimos contam para quem saiu no intervalo. Taxas "ajustadas" somam 450 minutos fictícios na média do time. A posição da ESPN não serve para setor (ala aparece como meio-campo); use `xg_participacao.funcao`.
 
 ## Operação
 
