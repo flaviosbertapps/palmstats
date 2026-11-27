@@ -160,14 +160,56 @@ export async function duplas(r: Recorte, funcoes: readonly string[], minimo: num
              coalesce(sum(sh.xg) filter (where not sh.do_palmeiras), 0) as contra
       from par left join sh on sh.partida_id = par.partida_id and sh.t >= par.ini and sh.t < par.fim
       group by 1, 2, 3, 4
+    ),
+    xa_time as (   -- xA do time por jogo (soma dos jogadores do FotMob)
+      select t.partida_id, t.min, sum(coalesce(g.xa, 0)) as xa
+      from tot t join xg_participacao g on g.partida_id = t.partida_id
+      group by 1, 2
+    ),
+    periodo as (
+      select x.jogador_id, min(p.data) as de, max(p.data) as ate
+      from participacoes x join partidas p on p.id = x.partida_id
+      where p.temporada = ${ANO} group by 1
+    ),
+    agg as (
+      select a_id, b_id, count(*) as jogos, sum(minutos) as minutos, sum(pro) as pro, sum(contra) as contra
+      from porjogo group by 1, 2 having sum(minutos) >= ${minimo}
+    ),
+    -- xA próprio de cada um nos jogos em que estiveram juntos, com os minutos do FotMob
+    xa_dupla as (
+      select pj.a_id, pj.b_id,
+             sum(coalesce(ga.xa, 0)) filter (where ga.jogador_id is not null) as xa_a, sum(ga.minutos) as min_a,
+             sum(coalesce(gb.xa, 0)) filter (where gb.jogador_id is not null) as xa_b, sum(gb.minutos) as min_b
+      from porjogo pj
+      join agg using (a_id, b_id)
+      left join xg_participacao ga on ga.partida_id = pj.partida_id and ga.jogador_id = pj.a_id
+      left join xg_participacao gb on gb.partida_id = pj.partida_id and gb.jogador_id = pj.b_id
+      group by 1, 2
+    ),
+    -- xA do time por jogo inteiro: "com" = 60+ minutos juntos; "sem" = demais jogos do período em comum
+    com_sem as (
+      select agg.a_id, agg.b_id,
+             sum(xt.xa) filter (where coalesce(pj.minutos, 0) >= 60) as xa_com,
+             sum(xt.min) filter (where coalesce(pj.minutos, 0) >= 60) as min_com,
+             sum(xt.xa) filter (where coalesce(pj.minutos, 0) < 60) as xa_sem,
+             sum(xt.min) filter (where coalesce(pj.minutos, 0) < 60) as min_sem
+      from agg
+      join periodo pa on pa.jogador_id = agg.a_id
+      join periodo pb on pb.jogador_id = agg.b_id
+      join partidas p on p.data between greatest(pa.de, pb.de) and least(pa.ate, pb.ate)
+      join xa_time xt on xt.partida_id = p.id
+      left join porjogo pj on pj.partida_id = p.id and pj.a_id = agg.a_id and pj.b_id = agg.b_id
+      group by 1, 2
     )
     select a.nome as a, b.nome as b, a.id as a_id, b.id as b_id, fa.funcao as fa, fb.funcao as fb,
-           count(*) as jogos, sum(minutos) as minutos, sum(pro) as pro, sum(contra) as contra
-    from porjogo
-    join jogadores a on a.id = a_id join jogadores b on b.id = b_id
-    join funcao fa on fa.jogador_id = a_id join funcao fb on fb.jogador_id = b_id
-    group by a.nome, b.nome, a.id, b.id, fa.funcao, fb.funcao
-    having sum(minutos) >= ${minimo}`;
+           agg.jogos, agg.minutos, agg.pro, agg.contra,
+           xd.xa_a, xd.min_a, xd.xa_b, xd.min_b,
+           cs.xa_com, cs.min_com, cs.xa_sem, cs.min_sem
+    from agg
+    join jogadores a on a.id = agg.a_id join jogadores b on b.id = agg.b_id
+    join funcao fa on fa.jogador_id = agg.a_id join funcao fb on fb.jogador_id = agg.b_id
+    left join xa_dupla xd on xd.a_id = agg.a_id and xd.b_id = agg.b_id
+    left join com_sem cs on cs.a_id = agg.a_id and cs.b_id = agg.b_id`;
 }
 
 /** Taxa por 90 puxada para a média do time quando há poucos minutos. */

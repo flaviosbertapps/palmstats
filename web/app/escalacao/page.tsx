@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { sql, umDe } from "@/lib/db";
 import { comp, n, num } from "@/lib/format";
+import { Th } from "@/components/Ajuda";
 import {
   ajustado, ANO, duplas, jogadores, K_AJUSTE, NOME_FUNCAO, resumoTime, SETORES,
   type Funcao, type Recorte, type Setor,
@@ -16,6 +17,32 @@ export const revalidate = 3600;
 type Busca = Promise<Record<string, string | string[] | undefined>>;
 const MINIMOS = ["90", "180", "300", "450", "900"] as const;
 const MIN_INDIVIDUAL = 270;
+
+const AJ = `Puxa a taxa para a média do time quando há poucos minutos: soma ${K_AJUSTE} minutos fictícios jogados no nível médio do time antes de dividir. Quem jogou pouco fica perto da média; só se destaca quem manteve a diferença por muito tempo. A tabela é ordenada por ele.`;
+const DICA: Record<string, string> = {
+  "Jogos": "Jogos em que estiveram em campo juntos ao mesmo tempo, em partidas com xG.",
+  "Min. juntos": "Minutos regulamentares com os dois em campo ao mesmo tempo (sem acréscimos).",
+  "Min.": "Minutos regulamentares em campo em jogos com xG (sem acréscimos).",
+  "xG pró/90": "xG das finalizações do Palmeiras com eles em campo, a cada 90 minutos. Quanto maior, mais e melhores chances o time criou.",
+  "xG contra/90": "xG das finalizações do adversário com eles em campo, a cada 90 minutos. Quanto menor, menos chances o time cedeu.",
+  "Saldo/90": "xG pró menos xG contra, a cada 90 minutos com eles em campo. Positivo = o time criou mais do que cedeu.",
+  "xA da dupla/90": "Soma do xA de cada um por 90 minutos, nos jogos em que estiveram juntos. xA (assistência esperada) é o xG da finalização que nasceu do passe do jogador, mesmo que não tenha virado gol.",
+  "xA time/jogo com": "xA de todo o time por 90 minutos nos jogos em que a dupla ficou 60 minutos ou mais junta. Conta o jogo inteiro: o FotMob não diz em que minuto saiu cada passe.",
+  "sem (xA)": "xA de todo o time por 90 minutos nos outros jogos do período em que os dois estavam no clube (juntos menos de 60 minutos ou separados).",
+  "Saldo/90 com": "xG pró menos xG contra do time a cada 90 minutos com ele em campo.",
+  "sem": "O mesmo número com ele fora de campo (banco, fora da lista ou substituído), só nos jogos do período em que estava no clube.",
+  "xG contra/90 com": "xG do adversário a cada 90 minutos com ele em campo. Menor é melhor.",
+  "Desarmes + int./90": "Desarmes mais interceptações a cada 90 minutos (FotMob). Mede volume: quem fica mais sem a bola acumula mais.",
+  "Recup./90": "Bolas recuperadas a cada 90 minutos (FotMob).",
+  "Duelos": "Porcentagem de duelos ganhos, no chão e pelo alto (FotMob).",
+  "Passes certos": "Porcentagem de passes certos (FotMob). Passe curto e para trás infla o número.",
+  "Terço final/90": "Passes que chegam ao terço final do campo, a cada 90 minutos (FotMob). Mede o quanto o jogador faz a bola avançar.",
+  "xA/90": "Assistência esperada a cada 90 minutos: xG das finalizações que nasceram do passe dele.",
+  "xG s/ pên./90": "xG das finalizações do próprio jogador a cada 90 minutos, sem pênaltis.",
+  "Soma/90": "xG sem pênalti + xA, a cada 90 minutos: tudo o que o jogador produziu ou criou de chance.",
+  "Chances criadas/90": "Passes que terminaram em finalização, a cada 90 minutos (FotMob).",
+  "xG pró/90 com": "xG do Palmeiras a cada 90 minutos com ele em campo. Mede o efeito no time, não a produção dele.",
+};
 
 function sinal(v: number | null, casas = 2) {
   if (v === null || Number.isNaN(v)) return "–";
@@ -71,6 +98,8 @@ export default async function Escalacao({ searchParams }: { searchParams: Busca 
     .map((d) => {
       const min = num(d.minutos) ?? 0, pro = num(d.pro) ?? 0, contra = num(d.contra) ?? 0;
       return { a: String(d.a), b: String(d.b), a_id: d.a_id, b_id: d.b_id, fa: d.fa, fb: d.fb, jogos: d.jogos, min, pro90: (90 * pro) / min, contra90: (90 * contra) / min,
+        xaDupla: p90(d.xa_a, d.min_a) === null || p90(d.xa_b, d.min_b) === null ? null : p90(d.xa_a, d.min_a)! + p90(d.xa_b, d.min_b)!,
+        xaCom: p90(d.xa_com, d.min_com), xaSem: p90(d.xa_sem, d.min_sem),
         saldo: (90 * (pro - contra)) / min, aj: ajustado(pro - contra, min, saldoTime) };
     })
     .sort((a, b) => b.aj - a.aj);
@@ -148,15 +177,20 @@ export default async function Escalacao({ searchParams }: { searchParams: Busca 
       <h2>Duplas: {SETORES[setor].nome.toLowerCase()}</h2>
       <p className="aviso">
         Os dois em campo ao mesmo tempo, com pelo menos {minimo} minutos juntos. A função de cada um é a principal,
-        mesmo que naquele jogo tenha atuado em outra.
+        mesmo que naquele jogo tenha atuado em outra. As colunas de xA do time contam jogos inteiros, porque o FotMob
+        não diz em que minuto saiu cada passe; por isso não somam com as de xG, que são minuto a minuto. Toque ou passe
+        o mouse no nome da coluna para ver o que ela mede.
       </p>
       {pares.length ? (
         <div className="tabela">
           <table>
             <thead>
-              <tr><th>Dupla</th><th className="num">Jogos</th><th className="num">Min. juntos</th>
-                <th className="num">xG pró/90</th><th className="num">xG contra/90</th><th className="num">Saldo/90</th>
-                <th className="num">Ajustado</th></tr>
+              <tr><th>Dupla</th>
+                {["Jogos", "Min. juntos", "xG pró/90", "xG contra/90", "Saldo/90"].map((c) => <Th key={c} rotulo={c} dica={DICA[c]} className="num" />)}
+                <Th rotulo="Ajustado" dica={`Saldo/90 ajustado. ${AJ}`} className="num" />
+                <Th rotulo="xA da dupla/90" dica={DICA["xA da dupla/90"]} className="num" />
+                <Th rotulo="xA time/90 com" dica={DICA["xA time/jogo com"]} className="num" />
+                <Th rotulo="sem" dica={DICA["sem (xA)"]} className="num" /></tr>
             </thead>
             <tbody>
               {pares.map((d) => (
@@ -171,6 +205,9 @@ export default async function Escalacao({ searchParams }: { searchParams: Busca 
                   <td className="num">{n(d.contra90, 2)}</td>
                   <td className="num"><Saldo v={d.saldo} /></td>
                   <td className="num"><strong><Saldo v={d.aj} /></strong></td>
+                  <td className="num">{n(d.xaDupla, 2)}</td>
+                  <td className="num">{n(d.xaCom, 2)}</td>
+                  <td className="num">{n(d.xaSem, 2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -191,7 +228,7 @@ export default async function Escalacao({ searchParams }: { searchParams: Busca 
           ["Min.", (l) => n(l.min)],
           ["Saldo/90 com", (l) => <Saldo v={l.com} />],
           ["sem", (l) => <Saldo v={l.sem} />],
-          ["Ajustado", (l) => <strong><Saldo v={l.aj} /></strong>],
+          ["Ajustado", (l) => <strong><Saldo v={l.aj} /></strong>, `Saldo/90 com ele, ajustado. ${AJ}`],
           ["xG contra/90 com", (l) => n(l.contra90, 2)],
           ["Desarmes + int./90", (l) => n(somaP90(l, ["desarmes", "interceptacoes"]), 1)],
           ["Recup./90", (l) => n(p90(l.recuperacoes, l.min_fm), 1)],
@@ -211,7 +248,7 @@ export default async function Escalacao({ searchParams }: { searchParams: Busca 
           ["Min.", (l) => n(l.min)],
           ["xG contra/90 com", (l) => n(l.contra90, 2)],
           ["sem", (l) => n(l.mf ? (90 * (num(l.contra_fora) ?? 0)) / l.mf : null, 2)],
-          ["Ajustado", (l) => <strong>{n(l.contraAj, 2)}</strong>],
+          ["Ajustado", (l) => <strong>{n(l.contraAj, 2)}</strong>, `xG contra/90 com ele, ajustado (menor é melhor). ${AJ}`],
           ["Saldo/90 com", (l) => <Saldo v={l.com} />],
           ["Desarmes + int./90", (l) => n(somaP90(l, ["desarmes", "interceptacoes"]), 1)],
           ["Duelos", (l) => pctDe(l.duelos_ganhos, l.duelos_perdidos)],
@@ -235,7 +272,7 @@ export default async function Escalacao({ searchParams }: { searchParams: Busca 
           ["Chances criadas/90", (l) => n(p90(l.chances_criadas, l.min_fm), 1)],
           ["xG pró/90 com", (l) => n(l.pro90, 2)],
           ["sem", (l) => n(l.mf ? (90 * (num(l.pro_fora) ?? 0)) / l.mf : null, 2)],
-          ["Ajustado", (l) => <strong>{n(l.proAj, 2)}</strong>],
+          ["Ajustado", (l) => <strong>{n(l.proAj, 2)}</strong>, `xG pró/90 com ele, ajustado. ${AJ}`],
           ["Saldo/90 com", (l) => <Saldo v={l.com} />],
         ]}
       />
@@ -268,13 +305,13 @@ function pctTot(c: unknown, t: unknown) {
 }
 
 function Tabela<T extends Linha>({ linhas, cols, funcao }: {
-  linhas: T[]; cols: [string, (l: T) => React.ReactNode][]; funcao?: boolean;
+  linhas: T[]; cols: [string, (l: T) => React.ReactNode, string?][]; funcao?: boolean;
 }) {
   if (!linhas.length) return <p className="aviso">Ninguém com minutos suficientes neste recorte.</p>;
   return (
     <div className="tabela">
       <table>
-        <thead><tr><th>Jogador</th>{cols.map(([c]) => <th key={c} className="num">{c}</th>)}</tr></thead>
+        <thead><tr><th>Jogador</th>{cols.map(([c, , d]) => <Th key={c} rotulo={c} dica={d ?? DICA[c]} className="num" />)}</tr></thead>
         <tbody>
           {linhas.map((l) => (
             <tr key={String(l.id)}>

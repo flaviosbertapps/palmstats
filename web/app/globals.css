@@ -137,3 +137,9 @@ footer { max-width: 1080px; margin: 0 auto; padding: 0 16px 32px; font-size: 12p
 .legenda i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
 .dica { position: absolute; pointer-events: none; background: var(--cartao); border: 1px solid var(--borda); border-radius: 8px; padding: 6px 9px; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.15); white-space: nowrap; }
 .pos { color: var(--vitoria); } .neg { color: var(--derrota); }
+
+.com-dica .rotulo-dica { all: unset; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+.com-dica .rotulo-dica:focus-visible { outline: 2px solid var(--verde); outline-offset: 2px; border-radius: 2px; }
+.balao { position: fixed; z-index: 50; width: min(260px, calc(100vw - 24px)); white-space: normal; text-transform: none;
+  letter-spacing: 0; font-weight: 400; font-size: 13px; line-height: 1.4; text-align: left; color: var(--texto);
+  background: var(--cartao); border: 1px solid var(--borda); border-radius: 8px; padding: 8px 10px; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
