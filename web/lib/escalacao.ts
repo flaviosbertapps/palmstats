@@ -140,26 +140,53 @@ export async function jogadores(r: Recorte) {
              ind.chances_criadas, ind.passes_terco_final`;
 }
 
-/** Duplas: minutos e xG do time com os dois em campo ao mesmo tempo. */
-export async function duplas(r: Recorte, funcoes: readonly string[], minimo: number) {
+/**
+ * Minuto a minuto de quem estava em campo em cada setor. A função vale por
+ * jogo (titular, grade do FotMob); quem entrou do banco fica com a principal.
+ * Minuto k = intervalo [k, k+1). Finalização no minuto m do relógio cai em
+ * k = m − 1; nos acréscimos (45+2, 90+3) cai no último minuto do tempo.
+ */
+function setorCte(funcoes: readonly string[]) {
   return sql`
-    with ${jogosCte(r)},
-    par as (
-      select a.partida_id, a.jogador_id as a_id, b.jogador_id as b_id,
-             greatest(a.ini, b.ini) as ini, least(a.fim, b.fim) as fim
-      from iv a join iv b on a.partida_id = b.partida_id and a.jogador_id < b.jogador_id
-      join funcao fa on fa.jogador_id = a.jogador_id and fa.funcao in ${sql(funcoes as string[])}
-      join funcao fb on fb.jogador_id = b.jogador_id and fb.funcao in ${sql(funcoes as string[])}
-      where least(a.fim, b.fim) > greatest(a.ini, b.ini)
+    setor_iv as (
+      select iv.partida_id, iv.jogador_id, floor(iv.ini)::int as ini, floor(iv.fim)::int as fim
+      from iv
+      left join xg_participacao g on g.partida_id = iv.partida_id and g.jogador_id = iv.jogador_id
+      left join funcao f on f.jogador_id = iv.jogador_id
+      where coalesce(g.funcao, f.funcao) in ${sql(funcoes as string[])}
+    ),
+    slot as (
+      select partida_id, jogador_id, generate_series(ini, fim - 1) as k from setor_iv where fim > ini
+    ),
+    nslot as (
+      select partida_id, k, count(*) as n, array_agg(jogador_id order by jogador_id) as js
+      from slot group by 1, 2
+    ),
+    shk as (
+      select partida_id, greatest(0, floor(t)::int - 1) as k,
+             sum(xg) filter (where do_palmeiras) as pro, sum(xg) filter (where not do_palmeiras) as contra
+      from sh group by 1, 2
+    )`;
+}
+
+/**
+ * Duplas do setor. Exclusiva: só os minutos em que os dois eram os únicos do
+ * setor em campo (sem um terceiro volante, por exemplo).
+ */
+export async function duplas(r: Recorte, funcoes: readonly string[], minimo: number, exclusiva: boolean) {
+  return sql`
+    with ${jogosCte(r)}, ${setorCte(funcoes)},
+    par_slot as (
+      select s1.partida_id, s1.k, s1.jogador_id as a_id, s2.jogador_id as b_id
+      from slot s1
+      join slot s2 on s2.partida_id = s1.partida_id and s2.k = s1.k and s1.jogador_id < s2.jogador_id
+      ${exclusiva ? sql`join nslot ns on ns.partida_id = s1.partida_id and ns.k = s1.k and ns.n = 2` : sql``}
     ),
     porjogo as (
-      select par.partida_id, a_id, b_id,
-             -- volta às fronteiras inteiras para contar minutos
-             floor(fim) - floor(ini) as minutos,
-             coalesce(sum(sh.xg) filter (where sh.do_palmeiras), 0) as pro,
-             coalesce(sum(sh.xg) filter (where not sh.do_palmeiras), 0) as contra
-      from par left join sh on sh.partida_id = par.partida_id and sh.t >= par.ini and sh.t < par.fim
-      group by 1, 2, 3, 4
+      select ps.partida_id, ps.a_id, ps.b_id, count(*) as minutos,
+             coalesce(sum(shk.pro), 0) as pro, coalesce(sum(shk.contra), 0) as contra
+      from par_slot ps left join shk on shk.partida_id = ps.partida_id and shk.k = ps.k
+      group by 1, 2, 3
     ),
     xa_time as (   -- xA do time por jogo (soma dos jogadores do FotMob)
       select t.partida_id, t.min, sum(coalesce(g.xa, 0)) as xa
@@ -210,6 +237,21 @@ export async function duplas(r: Recorte, funcoes: readonly string[], minimo: num
     join funcao fa on fa.jogador_id = agg.a_id join funcao fb on fb.jogador_id = agg.b_id
     left join xa_dupla xd on xd.a_id = agg.a_id and xd.b_id = agg.b_id
     left join com_sem cs on cs.a_id = agg.a_id and cs.b_id = agg.b_id`;
+}
+
+/** Formações com 3 ou mais jogadores do setor em campo ao mesmo tempo (ex.: três volantes). */
+export async function formacoes(r: Recorte, funcoes: readonly string[]) {
+  return sql`
+    with ${jogosCte(r)}, ${setorCte(funcoes)},
+    grupos as (
+      select ns.partida_id, ns.js, count(*) as minutos,
+             coalesce(sum(shk.pro), 0) as pro, coalesce(sum(shk.contra), 0) as contra
+      from nslot ns left join shk on shk.partida_id = ns.partida_id and shk.k = ns.k
+      where ns.n >= 3 group by 1, 2
+    )
+    select g.js, (select array_agg(j.nome order by j.nome) from jogadores j where j.id = any(g.js)) as nomes,
+           count(*) as jogos, sum(minutos) as minutos, sum(pro) as pro, sum(contra) as contra
+    from grupos g group by g.js order by sum(minutos) desc`;
 }
 
 /** Taxa por 90 puxada para a média do time quando há poucos minutos. */
