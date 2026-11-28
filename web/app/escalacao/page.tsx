@@ -4,7 +4,7 @@ import { sql, umDe } from "@/lib/db";
 import { comp, n, num } from "@/lib/format";
 import { Th } from "@/components/Ajuda";
 import {
-  ajustado, ANO, duplas, jogadores, K_AJUSTE, NOME_FUNCAO, resumoTime, SETORES,
+  ajustado, ANO, duplas, formacoes, jogadores, K_AJUSTE, NOME_FUNCAO, resumoTime, SETORES,
   type Funcao, type Recorte, type Setor,
 } from "@/lib/escalacao";
 
@@ -66,9 +66,13 @@ export default async function Escalacao({ searchParams }: { searchParams: Busca 
   const r: Recorte = { competicao: compId, grandes: q.grandes === "1" };
   const setor: Setor = umDe(q.setor, Object.keys(SETORES) as Setor[]) ?? "vol";
   const minimo = Number(umDe(q.minimo, MINIMOS) ?? "300");
+  // No ataque há sempre 3 ou 4 em campo: "só os dois" deixaria quase nenhum minuto.
+  const podeExclusiva = setor !== "ataque";
+  const exclusiva = podeExclusiva && q.juntos !== "todos";
 
-  const [time, js, ds] = await Promise.all([
-    resumoTime(r), jogadores(r), duplas(r, SETORES[setor].funcoes, minimo),
+  const [time, js, ds, fs] = await Promise.all([
+    resumoTime(r), jogadores(r), duplas(r, SETORES[setor].funcoes, minimo, exclusiva),
+    podeExclusiva ? formacoes(r, SETORES[setor].funcoes) : Promise.resolve([]),
   ]);
 
   if (!time.jogos || time.pro90 === null || time.contra90 === null) {
@@ -124,6 +128,12 @@ export default async function Escalacao({ searchParams }: { searchParams: Busca 
             {Object.entries(SETORES).map(([k, s]) => <option key={k} value={k}>{s.nome}</option>)}
           </select>
         </label>
+        <label>Minutos da dupla
+          <select name="juntos" defaultValue={exclusiva ? "" : "todos"} disabled={!podeExclusiva}>
+            <option value="">Só os dois do setor</option>
+            <option value="todos">Juntos, com ou sem um terceiro</option>
+          </select>
+        </label>
         <label>Mínimo juntos
           <select name="minimo" defaultValue={String(minimo)}>
             {MINIMOS.map((m) => <option key={m} value={m}>{m} min</option>)}
@@ -176,8 +186,11 @@ export default async function Escalacao({ searchParams }: { searchParams: Busca 
 
       <h2>Duplas: {SETORES[setor].nome.toLowerCase()}</h2>
       <p className="aviso">
-        Os dois em campo ao mesmo tempo, com pelo menos {minimo} minutos juntos. A função de cada um é a principal,
-        mesmo que naquele jogo tenha atuado em outra. As colunas de xA do time contam jogos inteiros, porque o FotMob
+        {exclusiva
+          ? <>Só os minutos em que os dois eram os únicos {SETORES[setor].nome.toLowerCase()} em campo (com um terceiro do setor, o minuto vai para a tabela de formações abaixo).</>
+          : <>Os dois em campo ao mesmo tempo, com ou sem um terceiro do setor{!podeExclusiva && " (no ataque há sempre 3 ou 4 em campo, então não dá para isolar a dupla)"}.</>}{" "}
+        Mínimo de {minimo} minutos. A função vale por jogo: titular pela posição em que começou; quem entrou do banco,
+        pela função principal. As colunas de xA do time contam jogos inteiros, porque o FotMob
         não diz em que minuto saiu cada passe; por isso não somam com as de xG, que são minuto a minuto. Toque ou passe
         o mouse no nome da coluna para ver o que ela mede.
       </p>
@@ -215,6 +228,37 @@ export default async function Escalacao({ searchParams }: { searchParams: Busca 
         </div>
       ) : (
         <p className="aviso">Nenhuma dupla com {minimo} minutos juntos neste recorte. Diminua o mínimo.</p>
+      )}
+
+      {fs.length > 0 && (
+        <>
+          <h3>Com três ou mais {SETORES[setor].nome.toLowerCase()} em campo</h3>
+          <div className="tabela">
+            <table>
+              <thead>
+                <tr><th>Formação</th>
+                  {["Jogos", "Min. juntos", "xG pró/90", "xG contra/90", "Saldo/90"].map((c) => <Th key={c} rotulo={c} dica={DICA[c]} className="num" />)}
+                  <Th rotulo="Ajustado" dica={`Saldo/90 ajustado. ${AJ}`} className="num" /></tr>
+              </thead>
+              <tbody>
+                {fs.map((f) => {
+                  const min = num(f.minutos) ?? 0, pro = num(f.pro) ?? 0, contra = num(f.contra) ?? 0;
+                  return (
+                    <tr key={String(f.js)}>
+                      <td>{(f.nomes as string[]).join(" + ")}{min < 90 && <span className="aviso"> · poucos minutos</span>}</td>
+                      <td className="num">{n(f.jogos)}</td>
+                      <td className="num">{n(min)}</td>
+                      <td className="num">{n((90 * pro) / min, 2)}</td>
+                      <td className="num">{n((90 * contra) / min, 2)}</td>
+                      <td className="num"><Saldo v={(90 * (pro - contra)) / min} /></td>
+                      <td className="num"><strong><Saldo v={ajustado(pro - contra, min, saldoTime)} /></strong></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       <h2>Volantes</h2>

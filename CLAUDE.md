@@ -77,7 +77,7 @@ Convenções:
 - Avisos de método: amostra pequena (< 10 jogos), menos de 900 minutos, posições diferentes e "correlação, não causa". **"Sem ele" só conta jogos do período em que o jogador estava no clube.**
 - **Gols decisivos**: sem os gols do jogador naquele jogo, o resultado mudaria. **Pontos rendidos** = pontos do resultado real menos os pontos sem os gols dele (mata-mata tratado como pontos corridos).
 - Clássicos = Corinthians, São Paulo e Santos.
-- **xG em campo** (`lib/escalacao.ts`): soma chute a chute do mapa do FotMob dentro do intervalo entrada–saída da ESPN; chutes nos acréscimos contam para quem saiu no intervalo. Taxas "ajustadas" somam 450 minutos fictícios na média do time. A posição da ESPN não serve para setor (ala aparece como meio-campo); use `xg_participacao.funcao`.
+- **xG em campo** (`lib/escalacao.ts`): soma chute a chute do mapa do FotMob dentro do intervalo entrada–saída da ESPN; chutes nos acréscimos contam para quem saiu no intervalo. Taxas "ajustadas" somam 450 minutos fictícios na média do time. A posição da ESPN não serve para setor (ala aparece como meio-campo); use `xg_participacao.funcao`. Duplas usam minuto a minuto (`setorCte`), com a função do titular naquele jogo (reserva: função principal) e, por padrão, só os minutos em que os dois eram os únicos do setor; 3+ do setor vão para "formações". No ataque a regra exclusiva fica desligada.
 
 ## Operação
 
